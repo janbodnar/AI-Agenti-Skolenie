@@ -1,0 +1,243 @@
+# Agenti vo VS Code
+
+V úvode sme si povedali, čo agent je, a v kapitole o guardrails, čo agent smie.  
+Teraz sa pozrieme na to, čo je vo VS Code **už hotové**: aké agentné roly editor  
+ponúka, na akých plochách sa s nimi pracuje a kedy ktorú použiť.  
+
+> 💡 **Hlavná myšlienka:** VS Code nemá „jedného agenta". Má **roly** (Plan,  
+> Agent, Ask) a **dve pracovné plochy** (Chat view, Agents window). Dobrý  
+> výsledok vznikne ich správnou kombináciou, nie hľadaním jedného tlačidla.  
+
+Prvá vec, ktorá pri agentoch vo VS Code mätie: slovo „agent" sa používa na  
+troch rôznych úrovniach. Kým si ich neodlíšime, nedá sa pochopiť, prečo sa  
+pickery prekrývajú alebo prečo sa niektorá voľba nedá vybrať.  
+
+---
+
+## Tri vrstvy, ktoré sa ľahko zamieňajú
+
+| Vrstva | Kde sa nastavuje | Čo určuje |
+| :--- | :--- | :--- |
+| **Harness (Session Target)** | ovládací prvok Session Target v chat inpute | ktorý runtime vykonáva agentnú slučku a kde beží (Copilot, Claude, Codex, Local, Cloud). |
+| **Rola agenta (Agent)** | picker Agent v chat inpute | aké inštrukcie, nástroje a správanie platia (Plan, Agent, Ask, vlastné agenty). |
+| **Plocha (surface)** | ako si chat otvoríte | kde pracujete: Chat view pri kóde, alebo Agents window naprieč projektmi. |
+
+Harness nie je model a nie je to ani rola. Zmena modelu nezmení harness a zmena  
+harnessu nezmení vaše projektové customizácie na iný formát.  
+
+```mermaid
+flowchart TD
+    ST["Session Target<br/>Copilot · Claude · Codex · Local · Cloud"]
+    R["Rola agenta<br/>Plan · Agent · Ask"]
+    M["Model<br/>reasoning · rýchlosť · cena"]
+    P["Permissions<br/>čo vyžaduje schválenie"]
+
+    S["Session<br/>úloha + kontext + zmeny"]
+    ST --> S
+    R --> S
+    M --> S
+    P --> S
+
+    S --> CV["Chat view<br/>code-first, pri kóde"]
+    S --> AW["Agents window<br/>agent-first, naprieč projektmi"]
+```
+
+*Štyri ovládacie prvky v chat inpute nastavujú jednu **session**. Tá istá  
+session sa dá otvoriť na oboch plochách.*  
+
+> ⚠️ **Pozor na tri významy slova „agent":** **Agent** je jedna konkrétna rola  
+> (spolu s Plan a Ask), **Agents window** je pracovná plocha a „agent" je  
+> všeobecný pojem pre celý systém.
+
+---
+
+## Rola agenta: Plan, Agent, Ask
+
+Rola sa vyberá v pickri **Agent** v chat inpute. Všetky tri majú prístup k  
+nástrojom, líšia sa však tým, čo smie rola urobiť s vaším kódom.  
+
+| Rola | Čo robí | Kedy ju použiť | Mení súbory? |
+| :--- | :--- | :--- | :--- |
+| **Plan** | Preskúma projekt, kladie doplňujúce otázky a zostaví plán s krokmi, súbormi a rizikami. Predvolene používa len nástroje na čítanie. | Keď je postup neistý alebo sa zmena dotýka viacerých častí projektu. | Nie, kým plán neschválite. |
+| **Agent** | Vykoná úlohu od zadania po overenie: nájde relevantný kód, upraví súbory, spustí testy a podľa výsledku iteruje. | Keď je cieľ jasný a chcete hotovú, overenú zmenu. | Áno. |
+| **Ask** | Vysvetlí kód, zodpovie otázku a navrhne riešenie bez úprav. | Keď sa učíte, skúmate cudzí kód alebo potrebujete poradiť, nie meniť. | Nie. |
+
+### Plan — pripraví plán pred úpravami
+
+Plan je jediná rola, ktorá je **od začiatku obmedzená na čítanie**. To je  
+zámer: jej výstupom nemá byť kód, ale rozhodnutie, čo sa bude robiť.  
+
+1. Do chatu napíšete `/plan` a zadanie – tým sa session prepne do Plan režimu.
+2. Agent preskúma projekt a počas práce sa pýta na to, čo musíte rozhodnúť vy.
+3. Výsledkom je karta na kontrolu plánu. V nej otvoríte celý plán, môžete ho
+   upraviť, dopísať pripomienky a poslať späť cez **Submit Feedback**.
+4. Plán potvrdíte jednou z akcií: **Implement Plan**, **Approve Plan Only**,
+   **Implement with Autopilot** alebo **Reject**.
+
+Po schválení sa cez **Start Implementation** session prepne na rolu **Agent** v  
+tej istej konverzácii a rovno odošle požiadavku na implementáciu. V Lokálnom  
+harnesse je plán uložený v pamäti session na `/memories/session/plan.md`, nie  
+ako súbor projektu.  
+
+> 🎓 **Analógia:** Plan je architekt, ktorý nakreslí projekt. Agent je stavbár,  
+> ktorý ho postaví. Ask je kolega, ktorý vám veci vysvetlí – a nič nezbúra.  
+
+### Agent — vykoná úlohu od zadania po overenie
+
+Agent je rola, ktorou sa VS Code približuje definícii agenta z úvodu: dostane  
+cieľ, sám zvolí kroky, použije nástroje a skontroluje výsledok.  
+
+* Prehľadá projekt a načíta kontext, namiesto aby sa spoliehal na text promptu.
+* Upraví implementáciu alebo testy podľa zadania a vašich obmedzení.
+* Spustí testy, pozrie si výsledok a pri neúspechu zmení postup.
+
+V niektorých harnessoch sa tá istá rola zobrazuje pod názvom **Interactive**.  
+Je to tá istá vec – plnohodnotná vykonávacia rola.  
+
+### Ask — vysvetlí kód a navrhne riešenie
+
+Ask je najbezpečnejšia rola: odpovedá a vysvetľuje, ale nemení súbory. Hodi sa  
+na orientáciu v cudzom projekte a na otázky typu „prečo je to takto".  
+
+> 📌 **Praktické pravidlo:** Keď neviete, čo presne chcete, začnite v **Ask**  
+> alebo **Plan**. Do **Agent** prejdite až vtedy, keď je cieľ jasný.  
+
+> ⚠️ **Pozor:** Dostupné roly závisia od zvoleného harnessu. V Agents window  
+> picker momentálne **neobsahuje Plan** – plánovanie tam spustíte príkazom  
+> `/plan` v Copilot alebo Claude session.  
+
+Do toho istého pickra sa pridávajú aj **vlastné agenty**. Definujú sa ako  
+`.agent.md` súbory s inštrukciami, zoznamom nástrojov a voliteľným modelom, a  
+dajú sa prepájať cez **handoffs** (napríklad z kontroly na opravu). Podrobne sa  
+im venuje samostatná kapitola o customizácii.  
+
+---
+
+## Dve plochy: Chat view a Agents window
+
+Plochy nie sú dva svety. Zdieľajú tie isté sessions, takže rozpracovanú úlohu  
+môžete kedykoľvek otvoriť na tej druhej strane a pokračovať v nej.  
+
+### Chat view — code-first práca v otvorenom projekte
+
+Chat view je panel v hlavnom okne VS Code, vedľa editora.  
+
+* Otvoríte ho cez **Ctrl+Alt+I**, cez menu Chat alebo príkazom `code chat`.
+* Umiestniť sa dá do bočného panela, do záložky editora alebo do samostatného
+  okna – podľa toho, koľko miesta chcete.
+* Zoznam sessions zobrazuje sessions **aktuálneho workspace** a sessions z tejto
+  plochy vždy pracujú v otvorenom priečinku.
+* Vedľa rozhovoru máte k dispozícii editor, debugger, terminál, testy, notebooky
+  aj integrovaný prehliadač.
+
+Zmeny sa ukladajú priamo do zvoleného priečinka. Zmenený súbor si otvoríte ako  
+diff a rovno v ňom necháte pripomienku pre agenta.  
+
+### Agents window — agent-first práca naprieč projektmi
+
+Agents window je **samostatné okno** VS Code, ktoré nefunguje okolo jedného  
+priečinka, ale okolo zadaní.  
+
+* Otvoríte ho tlačidlom **Open in Agents** v titulku, príkazom
+  *Chat: Open Agents window* alebo z príkazového riadka:
+
+```bash
+code --agents
+```
+
+* Zoznam sessions zbiera sessions zo **všetkých vašich workspace**, predvolene
+  zoskupené podľa projektu; dá sa triediť podľa času a doplniť vlastnými
+  skupinami.
+* Okrem chatu má panel **Changes** (zmeny a Git akcie) a panel **Files**
+  (súbory aktívnej session).
+* Sessions sa dajú poukladať **vedľa seba do mriežky**, takže paralelné úlohy
+  sledujete a porovnávate v jednom okne.
+* **Quick chats** sú rýchle rozhovory, ktoré nepatria k žiadnemu projektu.
+* **Code isolation** (priečinok vs. nový Git worktree) je dostupná iba tu.
+* Session vie štartovať z pull requestu a na konci vytvoriť **PR**.
+
+| Kritérium | Chat view | Agents window |
+| :--- | :--- | :--- |
+| **Zameranie** | kód v jednom otvorenom projekte | zadania a ich výsledky |
+| **Rozsah** | aktuálny workspace | všetky workspace naraz |
+| **Silná stránka** | ladenie, testy, terminál, editor | delegovanie, monitoring, PR |
+| **Izolácia zmien** | vždy aktuálny priečinok | priečinok alebo Git worktree |
+| **Usporiadanie** | jeden rozhovor vedľa kódu | viac sessions v mriežke |
+
+> 🎓 **Ako si vybrať:** Ak pri úlohe často editujete, ladíte a spúšťate testy v  
+> jednom projekte, použite **Chat view**. Ak úlohy prideľujete, sledujete ich  
+> beh a kontrolujete výsledky naprieč projektmi, použite **Agents window**.  
+
+---
+
+## Ako z toho vznikne jedna session
+
+**Session** je jednotka práce agenta: spája workspace, zmeny v kóde a jeden  
+alebo viac rozhovorov. Pred odoslaním prvého promptu nastavíte štyri veci:  
+
+1. **Session Target** – ktorý harness beží a kde (napríklad Copilot).
+2. **Agent** – ktorá rola platí (Plan, Agent, Ask, vlastný agent).
+3. **Language model** – ako agent uvažuje a koľko to stojí.
+4. **Permissions** – ktoré akcie vyžadujú vaše schválenie.
+
+V Agents window k tomu pribúda **Code isolation**. Podporované session môžu  
+obsahovať viac chatov, ktoré zdieľajú workspace a zmeny, ale majú vlastnú  
+históriu.  
+
+Zmenu harnessu alebo roly počas behu VS Code volá **handoff** – konverzácia a  
+kontext idú so sebou. Handoff je niečo iné ako **fork** (nová nezávislá  
+konverzácia z bodu v histórii) a niečo iné ako **prepnutie plochy** (tá istá  
+session, len iné okno).  
+
+---
+
+## Praktický postup: od plánu k zmene
+
+Toto je odporúčaný priebeh pre zmenu, ktorá sa dotkne viacerých súborov:  
+
+1. Otvorte **Chat view** (**Ctrl+Alt+I**) a založte nový chat.
+2. Ako Session Target zvoľte Copilot, ako rolu zvoľte **Plan** a napíšte
+   `/plan` so zadaním, obmedzeniami a tým, ako overíte úspech.
+3. Odpovedzte na doplňujúce otázky, kým agent plán nedokončí.
+4. Otvorte celý plán, prečítajte ho a cez **Submit Feedback** pošlite úpravy.
+   Sledujte, či plán sedí rozsahom, používa vzory projektu a obsahuje overenie.
+5. Cez **Start Implementation** prejdite na rolu **Agent**.
+6. Nechajte agenta spustiť testy. Overte, **čo naozaj skontroloval**, nielen
+   že napísal „hotovo".
+7. Prezrite diff a rozhodnite, čo si ponecháte. Až potom commit alebo PR.
+
+Ak máte viac nezávislých úloh, otvorte **Agents window**, zapnite **New  
+Worktree** a spustite ich paralelne – zmeny sa nepomiešajú s vaším otvoreným  
+priečinkom.  
+
+---
+
+## Kde čo nájdem
+
+| Čo chcem | Ako |
+| :--- | :--- |
+| Otvoriť Chat view | **Ctrl+Alt+I** |
+| Nový chat | **Ctrl+N** alebo `+` |
+| Inline chat v editore | **Ctrl+I** |
+| Otvoriť Agents window | *Chat: Open Agents window*, `code --agents` |
+| Spustiť plánovanie | `/plan` + zadanie |
+| Zbaliť dlhý kontext | `/compact` |
+| Odbočiť z konverzácie | `/fork` |
+| Spravovať customizácie | `/agents`, `/instructions`, `/skills`, `/prompts` |
+
+---
+
+## Čo si z kapitoly odnesieme
+
+* Vo VS Code sa „agent" nastavuje v **troch vrstvách**: harness, rola a plocha.
+* **Plan** pripraví plán a nemení súbory, **Agent** vykoná úlohu od zadania po
+  overenie, **Ask** vysvetlí a navrhne riešenie.
+* **Chat view** je code-first plocha v otvorenom projekte, **Agents window** je
+  agent-first okno naprieč projektmi – no zdieľajú tie isté sessions.
+* Jednu úlohu nastavujete cez Session Target, rolu, model a permissions;
+  plánovanie a implementácia sa dajú spojiť cez handoff.
+* Vlastné agenty sa pridávajú do toho istého pickra ako vstavané roly.
+
+> 📝 *Toto je prvotný koncept kapitoly. Nadväzuje na úvod a na kapitolu o  
+> guardrails; ďalšie kapitoly môžu rozobrať vlastné agenty (`.agent.md` a  
+> handoffs), subagentov a praktické cvičenia s Plan a Agent.*  
